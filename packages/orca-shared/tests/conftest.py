@@ -73,7 +73,7 @@ def make_execute_result(rows: list) -> MagicMock:
     """Return a mock CursorResult backed by *rows*."""
     result = MagicMock()
     result.scalar_one_or_none.return_value = rows[0] if rows else None
-    result.scalars.return_value = iter(rows)
+    result.scalars.side_effect = lambda: iter(rows)
     return result
 
 
