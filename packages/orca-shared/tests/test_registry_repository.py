@@ -30,14 +30,12 @@ from orca_shared.schemas.training import ExperimentResult
 
 
 class TestTaskRepositoryCreate:
-    @pytest.mark.asyncio
     async def test_add_and_flush_called(self, mock_session):
         data = TaskCreate(name="iris", task_type="classification")
         await TaskRepository(mock_session).create(data)
         mock_session.add.assert_called_once()
         mock_session.flush.assert_awaited_once()
 
-    @pytest.mark.asyncio
     async def test_returns_task_schema(self, mock_session):
         data = TaskCreate(name="iris", task_type="classification", domain="tabular")
         result = await TaskRepository(mock_session).create(data)
@@ -46,20 +44,17 @@ class TestTaskRepositoryCreate:
         assert result.task_type == "classification"
         assert result.domain == "tabular"
 
-    @pytest.mark.asyncio
     async def test_task_id_is_uuid(self, mock_session):
         data = TaskCreate(name="wine", task_type="classification")
         result = await TaskRepository(mock_session).create(data)
         assert isinstance(result.task_id, uuid.UUID)
 
-    @pytest.mark.asyncio
     async def test_metadata_field_correctly_mapped(self, mock_session):
         """Regression: task_metadata ORM attr must flow into schema metadata field."""
         data = TaskCreate(name="t", task_type="clf", metadata={"source": "openml"})
         result = await TaskRepository(mock_session).create(data)
         assert result.metadata == {"source": "openml"}
 
-    @pytest.mark.asyncio
     async def test_optional_fields_default_none(self, mock_session):
         data = TaskCreate(name="bare", task_type="regression")
         result = await TaskRepository(mock_session).create(data)
@@ -67,7 +62,6 @@ class TestTaskRepositoryCreate:
         assert result.n_samples is None
         assert result.n_features is None
 
-    @pytest.mark.asyncio
     async def test_created_at_set_to_utc_now(self, mock_session):
         data = TaskCreate(name="t", task_type="clf")
         before = datetime.now(timezone.utc)
@@ -77,7 +71,6 @@ class TestTaskRepositoryCreate:
 
 
 class TestTaskRepositoryGetById:
-    @pytest.mark.asyncio
     async def test_returns_task_when_found(self, mock_session, task_id):
         row = make_task_row(task_id=task_id, name="iris", task_type="classification")
         mock_session.execute.return_value = make_execute_result([row])
@@ -89,7 +82,6 @@ class TestTaskRepositoryGetById:
         assert result.task_id == task_id
         assert result.name == "iris"
 
-    @pytest.mark.asyncio
     async def test_returns_none_when_not_found(self, mock_session):
         mock_session.execute.return_value = make_execute_result([])
 
@@ -97,7 +89,6 @@ class TestTaskRepositoryGetById:
 
         assert result is None
 
-    @pytest.mark.asyncio
     async def test_orm_metadata_alias_resolved(self, mock_session, task_id):
         """task_metadata on the ORM row must appear as metadata in the schema."""
         row = make_task_row(task_id=task_id, task_metadata={"flag": True})
@@ -107,7 +98,6 @@ class TestTaskRepositoryGetById:
 
         assert result.metadata == {"flag": True}
 
-    @pytest.mark.asyncio
     async def test_execute_called_once(self, mock_session, task_id):
         mock_session.execute.return_value = make_execute_result([])
         await TaskRepository(mock_session).get_by_id(task_id)
@@ -115,7 +105,6 @@ class TestTaskRepositoryGetById:
 
 
 class TestTaskRepositoryListByDomain:
-    @pytest.mark.asyncio
     async def test_returns_task_summaries(self, mock_session):
         rows = [
             make_task_row(name="iris", domain="tabular", task_type="classification"),
@@ -130,7 +119,6 @@ class TestTaskRepositoryListByDomain:
         names = {r.name for r in results}
         assert names == {"iris", "wine"}
 
-    @pytest.mark.asyncio
     async def test_empty_domain_returns_empty_list(self, mock_session):
         mock_session.execute.return_value = make_execute_result([])
         results = await TaskRepository(mock_session).list_by_domain("nonexistent")
@@ -138,7 +126,6 @@ class TestTaskRepositoryListByDomain:
 
 
 class TestTaskRepositoryListByType:
-    @pytest.mark.asyncio
     async def test_returns_task_summaries_for_type(self, mock_session):
         rows = [make_task_row(task_type="regression")]
         mock_session.execute.return_value = make_execute_result(rows)
@@ -150,7 +137,6 @@ class TestTaskRepositoryListByType:
 
 
 class TestTaskRepositoryUpdateEmbedding:
-    @pytest.mark.asyncio
     async def test_calls_execute(self, mock_session):
         tid = uuid.uuid4()
         eid = uuid.uuid4()
@@ -160,7 +146,6 @@ class TestTaskRepositoryUpdateEmbedding:
 
         mock_session.execute.assert_awaited_once()
 
-    @pytest.mark.asyncio
     async def test_returns_none(self, mock_session):
         mock_session.execute.return_value = MagicMock()
         result = await TaskRepository(mock_session).update_embedding(uuid.uuid4(), uuid.uuid4())
@@ -173,27 +158,23 @@ class TestTaskRepositoryUpdateEmbedding:
 
 
 class TestExperimentRepositoryCreate:
-    @pytest.mark.asyncio
     async def test_add_and_flush_called(self, mock_session, task_id, model_id):
         await ExperimentRepository(mock_session).create(task_id, model_id)
         mock_session.add.assert_called_once()
         mock_session.flush.assert_awaited_once()
 
-    @pytest.mark.asyncio
     async def test_initial_status_is_pending(self, mock_session, task_id, model_id):
         """New experiments must start in 'pending' status."""
         repo = ExperimentRepository(mock_session)
         result = await repo.create(task_id, model_id)
         assert result.status == "pending"
 
-    @pytest.mark.asyncio
     async def test_returns_experiment_result(self, mock_session, task_id, model_id):
         result = await ExperimentRepository(mock_session).create(task_id, model_id)
         assert isinstance(result, ExperimentResult)
         assert result.task_id == task_id
         assert result.model_id == model_id
 
-    @pytest.mark.asyncio
     async def test_training_config_stored(self, mock_session, task_id, model_id):
         cfg = {"lr": 0.001, "epochs": 10}
         result = await ExperimentRepository(mock_session).create(
@@ -203,7 +184,6 @@ class TestExperimentRepositoryCreate:
         added_row = mock_session.add.call_args.args[0]
         assert added_row.training_config == cfg
 
-    @pytest.mark.asyncio
     async def test_created_by_stored(self, mock_session, task_id, model_id):
         await ExperimentRepository(mock_session).create(
             task_id, model_id, created_by="alice"
@@ -211,14 +191,12 @@ class TestExperimentRepositoryCreate:
         added_row = mock_session.add.call_args.args[0]
         assert added_row.created_by == "alice"
 
-    @pytest.mark.asyncio
     async def test_experiment_id_is_uuid(self, mock_session, task_id, model_id):
         result = await ExperimentRepository(mock_session).create(task_id, model_id)
         assert isinstance(result.experiment_id, uuid.UUID)
 
 
 class TestExperimentRepositoryGetById:
-    @pytest.mark.asyncio
     async def test_returns_experiment_when_found(self, mock_session, experiment_id):
         row = make_experiment_row(experiment_id=experiment_id, status="running")
         mock_session.execute.return_value = make_execute_result([row])
@@ -230,7 +208,6 @@ class TestExperimentRepositoryGetById:
         assert result.experiment_id == experiment_id
         assert result.status == "running"
 
-    @pytest.mark.asyncio
     async def test_returns_none_when_not_found(self, mock_session):
         mock_session.execute.return_value = make_execute_result([])
         result = await ExperimentRepository(mock_session).get_by_id(uuid.uuid4())
@@ -238,7 +215,6 @@ class TestExperimentRepositoryGetById:
 
 
 class TestExperimentRepositoryListByTask:
-    @pytest.mark.asyncio
     async def test_returns_list(self, mock_session, task_id):
         rows = [
             make_experiment_row(task_id=task_id, status="completed"),
@@ -252,7 +228,6 @@ class TestExperimentRepositoryListByTask:
         statuses = {r.status for r in results}
         assert statuses == {"completed", "failed"}
 
-    @pytest.mark.asyncio
     async def test_empty_list(self, mock_session, task_id):
         mock_session.execute.return_value = make_execute_result([])
         results = await ExperimentRepository(mock_session).list_by_task(task_id)
@@ -260,13 +235,11 @@ class TestExperimentRepositoryListByTask:
 
 
 class TestExperimentRepositoryUpdateStatus:
-    @pytest.mark.asyncio
     async def test_calls_execute(self, mock_session, experiment_id):
         mock_session.execute.return_value = MagicMock()
         await ExperimentRepository(mock_session).update_status(experiment_id, "running")
         mock_session.execute.assert_awaited_once()
 
-    @pytest.mark.asyncio
     async def test_returns_none(self, mock_session, experiment_id):
         mock_session.execute.return_value = MagicMock()
         result = await ExperimentRepository(mock_session).update_status(experiment_id, "running")
@@ -274,13 +247,11 @@ class TestExperimentRepositoryUpdateStatus:
 
 
 class TestExperimentRepositoryMarkComplete:
-    @pytest.mark.asyncio
     async def test_calls_execute(self, mock_session, experiment_id):
         mock_session.execute.return_value = MagicMock()
         await ExperimentRepository(mock_session).mark_complete(experiment_id, "mlrun-abc")
         mock_session.execute.assert_awaited_once()
 
-    @pytest.mark.asyncio
     async def test_returns_none(self, mock_session, experiment_id):
         mock_session.execute.return_value = MagicMock()
         result = await ExperimentRepository(mock_session).mark_complete(
@@ -295,13 +266,11 @@ class TestExperimentRepositoryMarkComplete:
 
 
 class TestPerformanceRepositoryLogMetric:
-    @pytest.mark.asyncio
     async def test_add_and_flush_called(self, mock_session, experiment_id):
         await PerformanceRepository(mock_session).log_metric(experiment_id, "acc", 0.9)
         mock_session.add.assert_called_once()
         mock_session.flush.assert_awaited_once()
 
-    @pytest.mark.asyncio
     async def test_returns_metric_point(self, mock_session, experiment_id):
         result = await PerformanceRepository(mock_session).log_metric(
             experiment_id, "accuracy", 0.95
@@ -310,28 +279,24 @@ class TestPerformanceRepositoryLogMetric:
         assert result.name == "accuracy"
         assert result.value == pytest.approx(0.95)
 
-    @pytest.mark.asyncio
     async def test_epoch_mapped_to_step(self, mock_session, experiment_id):
         result = await PerformanceRepository(mock_session).log_metric(
             experiment_id, "loss", 0.3, epoch=7
         )
         assert result.step == 7
 
-    @pytest.mark.asyncio
     async def test_is_final_propagated(self, mock_session, experiment_id):
         result = await PerformanceRepository(mock_session).log_metric(
             experiment_id, "f1", 0.88, is_final=True
         )
         assert result.is_final is True
 
-    @pytest.mark.asyncio
     async def test_is_final_defaults_false(self, mock_session, experiment_id):
         result = await PerformanceRepository(mock_session).log_metric(
             experiment_id, "loss", 0.5
         )
         assert result.is_final is False
 
-    @pytest.mark.asyncio
     async def test_orm_row_attributes_set(self, mock_session, experiment_id):
         await PerformanceRepository(mock_session).log_metric(
             experiment_id, "acc", 0.9, epoch=3, is_final=True
@@ -345,7 +310,6 @@ class TestPerformanceRepositoryLogMetric:
 
 
 class TestPerformanceRepositoryGetFinalMetrics:
-    @pytest.mark.asyncio
     async def test_aggregates_final_rows(self, mock_session, experiment_id):
         rows = [
             make_performance_row(
@@ -372,7 +336,6 @@ class TestPerformanceRepositoryGetFinalMetrics:
         assert result.final_metrics["accuracy"] == pytest.approx(0.95)
         assert result.final_metrics["f1"] == pytest.approx(0.88)
 
-    @pytest.mark.asyncio
     async def test_best_epoch_is_max(self, mock_session, experiment_id):
         rows = [
             make_performance_row(metric_name="acc", metric_value=0.9, epoch=5, is_final=True),
@@ -385,7 +348,6 @@ class TestPerformanceRepositoryGetFinalMetrics:
         assert result.best_epoch == 12
         assert set(result.final_metrics) == {"acc", "f1"}
 
-    @pytest.mark.asyncio
     async def test_empty_result_gives_empty_dict(self, mock_session, experiment_id):
         mock_session.execute.return_value = make_execute_result([])
 
@@ -394,7 +356,6 @@ class TestPerformanceRepositoryGetFinalMetrics:
         assert result.final_metrics == {}
         assert result.best_epoch is None
 
-    @pytest.mark.asyncio
     async def test_ignores_rows_with_none_metric_name(self, mock_session, experiment_id):
         rows = [
             make_performance_row(metric_name=None, metric_value=0.5, is_final=True),
@@ -408,7 +369,6 @@ class TestPerformanceRepositoryGetFinalMetrics:
         assert None not in result.final_metrics
         assert result.best_epoch == 3
 
-    @pytest.mark.asyncio
     async def test_best_epoch_none_when_all_epochs_none(self, mock_session, experiment_id):
         rows = [
             make_performance_row(metric_name="acc", metric_value=0.9, epoch=None, is_final=True),
@@ -421,7 +381,6 @@ class TestPerformanceRepositoryGetFinalMetrics:
 
 
 class TestPerformanceRepositoryGetHistory:
-    @pytest.mark.asyncio
     async def test_returns_metric_points(self, mock_session, experiment_id):
         rows = [
             make_performance_row(metric_name="loss", metric_value=0.5, epoch=1),
@@ -437,7 +396,6 @@ class TestPerformanceRepositoryGetHistory:
         values = [r.value for r in results]
         assert pytest.approx(values) == [0.5, 0.3, 0.1]
 
-    @pytest.mark.asyncio
     async def test_null_metric_value_defaults_to_zero(self, mock_session, experiment_id):
         rows = [
             make_performance_row(metric_name="loss", metric_value=None, epoch=1),
@@ -448,7 +406,6 @@ class TestPerformanceRepositoryGetHistory:
 
         assert results[0].value == pytest.approx(0.0)
 
-    @pytest.mark.asyncio
     async def test_empty_history(self, mock_session, experiment_id):
         mock_session.execute.return_value = make_execute_result([])
         results = await PerformanceRepository(mock_session).get_history(experiment_id, "acc")
