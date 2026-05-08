@@ -29,4 +29,4 @@ class ArtifactManager:
         import torch
 
         data = await self._storage.download(uri)
-        return torch.load(io.BytesIO(data), weights_only=False)
+        return torch.load(io.BytesIO(data), weights_only=True)
