@@ -383,6 +383,7 @@ class TestPerformanceRepositoryGetFinalMetrics:
         result = await PerformanceRepository(mock_session).get_final_metrics(experiment_id)
 
         assert result.best_epoch == 12
+        assert set(result.final_metrics) == {"acc", "f1"}
 
     @pytest.mark.asyncio
     async def test_empty_result_gives_empty_dict(self, mock_session, experiment_id):
