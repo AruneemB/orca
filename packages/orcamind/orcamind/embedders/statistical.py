@@ -100,9 +100,22 @@ class StatisticalEmbedder(TaskEmbedder):
         vec[4] = _safe(dataset.isna().values.mean())
 
         # ---- 5: categorical_ratio ----
+        _NULLABLE_CATEGORICAL_NAMES = {
+            "string", "boolean",
+            "Int8", "Int16", "Int32", "Int64",
+            "UInt8", "UInt16", "UInt32", "UInt64",
+        }
         cat_cols = [
             c for c in dataset.columns
-            if isinstance(dataset[c].dtype, pd.CategoricalDtype) or dataset[c].dtype == object
+            if (
+                isinstance(dataset[c].dtype, pd.CategoricalDtype)
+                or pd.api.types.is_object_dtype(dataset[c])
+                or pd.api.types.is_bool_dtype(dataset[c])
+                or (
+                    pd.api.types.is_extension_array_dtype(dataset[c])
+                    and dataset[c].dtype.name in _NULLABLE_CATEGORICAL_NAMES
+                )
+            )
         ]
         vec[5] = _safe(len(cat_cols) / max(n_cols, 1))
 
@@ -217,6 +230,16 @@ class StatisticalEmbedder(TaskEmbedder):
 
     @staticmethod
     def _is_classification(labels: pd.Series) -> bool:
-        """Treat integer or object/string label columns as classification tasks."""
+        """Treat integer, boolean, object, or string label columns as classification tasks."""
         dtype = labels.dtype
-        return dtype == object or str(dtype).startswith("int") or str(dtype) == "bool"
+        if pd.api.types.is_bool_dtype(dtype) or pd.api.types.is_object_dtype(dtype):
+            return True
+        if str(dtype).startswith("int") or str(dtype).startswith("uint"):
+            return True
+        if pd.api.types.is_extension_array_dtype(dtype) and dtype.name in {
+            "string", "boolean",
+            "Int8", "Int16", "Int32", "Int64",
+            "UInt8", "UInt16", "UInt32", "UInt64",
+        }:
+            return True
+        return False
