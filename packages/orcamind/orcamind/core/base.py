@@ -28,13 +28,19 @@ class MetaLearner(ABC):
         support_x: Tensor,
         support_y: Tensor,
         num_steps: int | None = None,
-    ) -> tuple[nn.Module, list[float]]: ...
+    ) -> tuple[nn.Module, list[float]]:
+        """Adapt the model to a support set; return (adapted_model, per-step losses)."""
+        ...
 
     @abstractmethod
-    def meta_update(self, task_batch: list[Task]) -> dict[str, float]: ...
+    def meta_update(self, task_batch: list[Task]) -> dict[str, float]:
+        """Perform one outer-loop optimiser step over a batch of tasks; return training metrics."""
+        ...
 
     @abstractmethod
-    def adapt(self, support_x: Tensor, support_y: Tensor) -> nn.Module: ...
+    def adapt(self, support_x: Tensor, support_y: Tensor) -> nn.Module:
+        """Return a task-adapted copy of the model without modifying the original."""
+        ...
 
     @abstractmethod
     def evaluate_task(
@@ -42,4 +48,6 @@ class MetaLearner(ABC):
         adapted_model: nn.Module,
         query_x: Tensor,
         query_y: Tensor,
-    ) -> dict[str, float]: ...
+    ) -> dict[str, float]:
+        """Compute loss and accuracy on a query set with an already-adapted model."""
+        ...
