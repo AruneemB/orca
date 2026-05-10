@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 import numpy as np
 import pytest
 import torch
@@ -133,10 +134,10 @@ class TestMetaUpdate:
         assert result["meta_train_loss"] >= 0.0
 
     def test_empty_task_batch_returns_zero_metrics(self, reptile: Reptile) -> None:
-        """Empty task_batch returns zeroed metrics without raising."""
+        """Empty task_batch returns zero loss and NaN accuracy without raising."""
         result = reptile.meta_update([])
         assert result["meta_train_loss"] == 0.0
-        assert result["meta_train_accuracy"] == 0.0
+        assert math.isnan(result["meta_train_accuracy"])
 
     def test_empty_task_batch_does_not_modify_model(self, reptile: Reptile) -> None:
         """Empty task_batch leaves all model parameters unchanged."""
