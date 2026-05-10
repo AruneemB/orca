@@ -131,8 +131,20 @@ class WarmStartTransfer:
             return target_model, {"lr_multiplier": 1.0, "freeze_backbone_epochs": 0}
 
         source_task_id, score = candidates[0]
-        source_task = await self._task_repository.get_by_id(uuid.UUID(source_task_id))
-        target_task = await self._task_repository.get_by_id(uuid.UUID(target_task_id))
+        try:
+            source_uuid = uuid.UUID(source_task_id)
+        except ValueError as exc:
+            raise ValueError(
+                f"Invalid source task UUID {source_task_id!r}: {exc}"
+            ) from exc
+        try:
+            target_uuid = uuid.UUID(target_task_id)
+        except ValueError as exc:
+            raise ValueError(
+                f"Invalid target task UUID {target_task_id!r}: {exc}"
+            ) from exc
+        source_task = await self._task_repository.get_by_id(source_uuid)
+        target_task = await self._task_repository.get_by_id(target_uuid)
         checkpoint_uri: str = (source_task.metadata or {}).get(
             "checkpoint_uri",
             f"models/{source_task_id}/checkpoint",
