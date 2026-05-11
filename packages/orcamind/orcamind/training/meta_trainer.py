@@ -59,7 +59,6 @@ class MetaTrainer(pl.LightningModule):
         sampler: Any,
         task_pool: list[Task],
         batch_size: int = 4,
-        mlflow_experiment: str | None = None,
         num_batches_per_epoch: int | None = None,
     ) -> None:
         super().__init__()
@@ -67,7 +66,6 @@ class MetaTrainer(pl.LightningModule):
         self._sampler = sampler
         self._task_pool = task_pool
         self._batch_size = batch_size
-        self._mlflow_experiment = mlflow_experiment
         self._num_batches = num_batches_per_epoch or max(
             1, len(task_pool) // batch_size
         )
