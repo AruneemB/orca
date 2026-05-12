@@ -269,13 +269,20 @@ class TestDownloadSuite:
 
 
 class TestFetchDataset:
+    def setup_method(self):
+        self._openml_mock = MagicMock()
+        self._openml_mock.tasks.TaskType.SUPERVISED_CLASSIFICATION = 1
+        self._patcher = patch.dict(
+            "sys.modules",
+            {"openml": self._openml_mock, "openml.tasks": self._openml_mock.tasks},
+        )
+        self._patcher.start()
+
+    def teardown_method(self):
+        self._patcher.stop()
+
     def _make_openml_task(self, task_type_id=1) -> MagicMock:
         """Build a minimal mock of an OpenML task."""
-        import sys
-        openml_mock = MagicMock()
-        openml_mock.tasks.TaskType.SUPERVISED_CLASSIFICATION = 1
-        patch.dict("sys.modules", {"openml": openml_mock, "openml.tasks": openml_mock.tasks}).start()
-
         X = pd.DataFrame({"a": [1.0, 2.0, 3.0], "b": [4.0, 5.0, 6.0]})
         y = pd.Series([0, 1, 0], name="target")
         task = MagicMock()
