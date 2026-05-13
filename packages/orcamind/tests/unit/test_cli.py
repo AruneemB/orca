@@ -535,3 +535,136 @@ class TestTrain:
              patch("torch.save"):
             result = runner.invoke(app, ["train", "--config", str(cfg_file), "--device", "cpu"])
         assert "cpu" in result.output
+
+
+# ── recommend ─────────────────────────────────────────────────────────────────
+
+
+_SAMPLE_RECS = [
+    {"model_name": "RandomForest", "confidence": 0.9, "algorithm": "nn"},
+    {"model_name": "XGBoost", "confidence": 0.8, "algorithm": "nn"},
+    {"model_name": "SVM", "confidence": 0.7, "algorithm": "nn"},
+]
+
+
+def _mock_http_client(response: MagicMock) -> MagicMock:
+    """Build a mock httpx.Client context manager that returns *response* from .post()."""
+    client = MagicMock()
+    client.__enter__ = MagicMock(return_value=client)
+    client.__exit__ = MagicMock(return_value=False)
+    client.post = MagicMock(return_value=response)
+    return client
+
+
+def _ok_response(data: object) -> MagicMock:
+    resp = MagicMock()
+    resp.json.return_value = data
+    resp.raise_for_status = MagicMock()
+    return resp
+
+
+class TestRecommend:
+    def test_missing_file_exits_nonzero(self) -> None:
+        result = runner.invoke(app, ["recommend", "nonexistent.csv"])
+        assert result.exit_code != 0
+
+    def test_no_args_exits_nonzero(self) -> None:
+        result = runner.invoke(app, ["recommend"])
+        assert result.exit_code != 0
+
+    def test_exits_zero_on_success(self, tmp_path: Path) -> None:
+        csv_file = _make_csv(tmp_path / "data.csv")
+        client = _mock_http_client(_ok_response(_SAMPLE_RECS))
+        with patch("orcamind.embedders.statistical.StatisticalEmbedder.embed", return_value=_STAT_VEC), \
+             patch("httpx.Client", return_value=client):
+            result = runner.invoke(app, ["recommend", str(csv_file)])
+        assert result.exit_code == 0
+
+    def test_calls_recommend_model_endpoint(self, tmp_path: Path) -> None:
+        csv_file = _make_csv(tmp_path / "data.csv")
+        client = _mock_http_client(_ok_response(_SAMPLE_RECS))
+        with patch("orcamind.embedders.statistical.StatisticalEmbedder.embed", return_value=_STAT_VEC), \
+             patch("httpx.Client", return_value=client):
+            runner.invoke(app, ["recommend", str(csv_file)])
+        call_url = client.post.call_args.args[0]
+        assert "/api/v1/recommend-model" in call_url
+
+    def test_sends_embedding_in_payload(self, tmp_path: Path) -> None:
+        csv_file = _make_csv(tmp_path / "data.csv")
+        client = _mock_http_client(_ok_response(_SAMPLE_RECS))
+        with patch("orcamind.embedders.statistical.StatisticalEmbedder.embed", return_value=_STAT_VEC), \
+             patch("httpx.Client", return_value=client):
+            runner.invoke(app, ["recommend", str(csv_file)])
+        payload = client.post.call_args.kwargs["json"]
+        assert "task_embedding" in payload
+
+    def test_sends_top_k_in_payload(self, tmp_path: Path) -> None:
+        csv_file = _make_csv(tmp_path / "data.csv")
+        client = _mock_http_client(_ok_response(_SAMPLE_RECS))
+        with patch("orcamind.embedders.statistical.StatisticalEmbedder.embed", return_value=_STAT_VEC), \
+             patch("httpx.Client", return_value=client):
+            runner.invoke(app, ["recommend", str(csv_file), "--top-k", "5"])
+        payload = client.post.call_args.kwargs["json"]
+        assert payload["top_k"] == 5
+
+    def test_default_top_k_is_3(self, tmp_path: Path) -> None:
+        csv_file = _make_csv(tmp_path / "data.csv")
+        client = _mock_http_client(_ok_response(_SAMPLE_RECS))
+        with patch("orcamind.embedders.statistical.StatisticalEmbedder.embed", return_value=_STAT_VEC), \
+             patch("httpx.Client", return_value=client):
+            runner.invoke(app, ["recommend", str(csv_file)])
+        payload = client.post.call_args.kwargs["json"]
+        assert payload["top_k"] == 3
+
+    def test_custom_api_url_used_in_request(self, tmp_path: Path) -> None:
+        csv_file = _make_csv(tmp_path / "data.csv")
+        client = _mock_http_client(_ok_response(_SAMPLE_RECS))
+        with patch("orcamind.embedders.statistical.StatisticalEmbedder.embed", return_value=_STAT_VEC), \
+             patch("httpx.Client", return_value=client):
+            runner.invoke(app, ["recommend", str(csv_file), "--api-url", "http://myserver:9000"])
+        call_url = client.post.call_args.args[0]
+        assert "myserver:9000" in call_url
+
+    def test_http_error_exits_nonzero(self, tmp_path: Path) -> None:
+        import httpx
+
+        csv_file = _make_csv(tmp_path / "data.csv")
+        client = _mock_http_client(MagicMock())
+        client.post.side_effect = httpx.HTTPError("connection refused")
+        with patch("orcamind.embedders.statistical.StatisticalEmbedder.embed", return_value=_STAT_VEC), \
+             patch("httpx.Client", return_value=client):
+            result = runner.invoke(app, ["recommend", str(csv_file)])
+        assert result.exit_code != 0
+
+    def test_short_top_k_flag(self) -> None:
+        result = runner.invoke(app, ["recommend", "--help"])
+        assert "-k" in result.output
+
+    def test_api_url_flag_in_help(self) -> None:
+        result = runner.invoke(app, ["recommend", "--help"])
+        assert "--api-url" in result.output
+
+    def test_output_contains_top_k_in_title(self, tmp_path: Path) -> None:
+        csv_file = _make_csv(tmp_path / "data.csv")
+        client = _mock_http_client(_ok_response(_SAMPLE_RECS))
+        with patch("orcamind.embedders.statistical.StatisticalEmbedder.embed", return_value=_STAT_VEC), \
+             patch("httpx.Client", return_value=client):
+            result = runner.invoke(app, ["recommend", str(csv_file), "--top-k", "3"])
+        assert "3" in result.output
+
+    def test_list_response_handled(self, tmp_path: Path) -> None:
+        csv_file = _make_csv(tmp_path / "data.csv")
+        client = _mock_http_client(_ok_response(_SAMPLE_RECS))
+        with patch("orcamind.embedders.statistical.StatisticalEmbedder.embed", return_value=_STAT_VEC), \
+             patch("httpx.Client", return_value=client):
+            result = runner.invoke(app, ["recommend", str(csv_file)])
+        assert result.exit_code == 0
+
+    def test_dict_response_with_recommendations_key(self, tmp_path: Path) -> None:
+        csv_file = _make_csv(tmp_path / "data.csv")
+        wrapped = {"recommendations": _SAMPLE_RECS}
+        client = _mock_http_client(_ok_response(wrapped))
+        with patch("orcamind.embedders.statistical.StatisticalEmbedder.embed", return_value=_STAT_VEC), \
+             patch("httpx.Client", return_value=client):
+            result = runner.invoke(app, ["recommend", str(csv_file)])
+        assert result.exit_code == 0
