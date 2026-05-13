@@ -37,7 +37,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     app.state.predictor = PerformancePredictor()
 
     faiss_path = os.environ.get("FAISS_INDEX_PATH", "data/faiss_index")
-    idx = FaissIndex(dim=25, metric="cosine")
+    idx = FaissIndex(dim=app.state.stat_embedder.embedding_dim, metric="cosine")
     try:
         idx.load(faiss_path)
         app.state.faiss_index = idx
