@@ -56,7 +56,32 @@ def callback(
 @app.command()
 def init() -> None:
     """Initialise workspace directories, default config, and MLflow experiment."""
-    typer.echo("[orcamind] init command not yet implemented — scaffold only")
+    for directory in ("data", "models", "logs"):
+        Path(directory).mkdir(parents=True, exist_ok=True)
+        typer.echo(f"[orcamind] Created directory: {directory}/")
+
+    config_path = Path("config/config.yaml")
+    if not config_path.exists():
+        config_path.parent.mkdir(parents=True, exist_ok=True)
+        config_path.write_text(_DEFAULT_CONFIG_YAML)
+        typer.echo(f"[orcamind] Wrote default config: {config_path}")
+    else:
+        typer.echo(f"[orcamind] Config already exists: {config_path}")
+
+    try:
+        import mlflow
+        from omegaconf import OmegaConf
+
+        cfg = OmegaConf.load(str(config_path))
+        experiment_name = cfg.mlflow.experiment_name
+        tracking_uri = cfg.mlflow.tracking_uri
+        mlflow.set_tracking_uri(str(tracking_uri))
+        mlflow.set_experiment(str(experiment_name))
+        typer.echo(f"[orcamind] MLflow experiment ready: {experiment_name}")
+    except Exception as exc:
+        typer.echo(f"[orcamind] MLflow init skipped: {exc}", err=True)
+
+    typer.echo("[orcamind] Workspace initialized.")
 
 
 @app.command()
@@ -104,8 +129,16 @@ def serve(
     reload: bool = typer.Option(False, "--reload", help="Enable auto-reload for development."),
 ) -> None:
     """Start the OrcaMind FastAPI service with Uvicorn."""
+    import uvicorn
+
     typer.echo(f"[orcamind] Starting API server on {host}:{port}")
-    typer.echo("[orcamind] serve command not yet implemented — scaffold only")
+    uvicorn.run(
+        "orcamind.api.main:create_app",
+        factory=True,
+        host=host,
+        port=port,
+        reload=reload,
+    )
 
 
 @app.command()
@@ -113,8 +146,20 @@ def dashboard(
     port: int = typer.Option(8501, "--port", "-p", help="Streamlit server port."),
 ) -> None:
     """Launch the OrcaMind Streamlit dashboard."""
+    dashboard_script = Path(__file__).parent / "dashboard" / "app.py"
     typer.echo(f"[orcamind] Starting dashboard on port {port}")
-    typer.echo("[orcamind] dashboard command not yet implemented — scaffold only")
+    subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "streamlit",
+            "run",
+            str(dashboard_script),
+            "--server.port",
+            str(port),
+        ],
+        check=True,
+    )
 
 
 if __name__ == "__main__":
