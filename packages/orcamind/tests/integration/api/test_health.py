@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from unittest.mock import MagicMock
+
 import pytest
 from httpx import AsyncClient
 
@@ -30,9 +32,24 @@ class TestHealthEndpoint:
         assert "faiss" in body
         assert "mlflow" in body
 
-    async def test_status_is_healthy(self, client: AsyncClient) -> None:
+    async def test_status_is_degraded_when_faiss_not_loaded(
+        self, client: AsyncClient
+    ) -> None:
+        # The conftest sets faiss_index=None, so db=True but faiss=False → "degraded".
         body = (await client.get("/health")).json()
-        assert body["status"] == "healthy"
+        assert body["status"] == "degraded"
+
+    async def test_status_is_healthy_when_all_deps_ok(
+        self, client: AsyncClient
+    ) -> None:
+        # Temporarily set a non-None faiss_index so overall_ok becomes True.
+        app = client._transport.app  # type: ignore[attr-defined]
+        app.state.faiss_index = MagicMock()
+        try:
+            body = (await client.get("/health")).json()
+            assert body["status"] == "healthy"
+        finally:
+            app.state.faiss_index = None
 
     async def test_faiss_false_when_index_not_loaded(
         self, client: AsyncClient
