@@ -6,7 +6,7 @@ import json
 import subprocess
 import sys
 from pathlib import Path
-from typing import Optional
+from typing import Literal, Optional
 
 import typer
 
@@ -90,7 +90,7 @@ def train(
         "config/config.yaml", "--config", "-c", help="Path to OmegaConf/Hydra config file."
     ),
     epochs: int = typer.Option(10, "--epochs", "-e", help="Number of meta-training epochs."),
-    device: str = typer.Option("cpu", "--device", "-d", help="Training device: cpu or cuda."),
+    device: Literal["cpu", "cuda"] = typer.Option("cpu", "--device", "-d", help="Training device: cpu or cuda."),
 ) -> None:
     """Launch a meta-training run using the configured meta-learner and task sampler."""
     typer.echo(f"[orcamind] Loading config: {config}")

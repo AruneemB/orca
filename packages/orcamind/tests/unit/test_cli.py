@@ -423,6 +423,11 @@ def _write_config(tmp_path: Path) -> Path:
     return config_file
 
 
+def test_train_invalid_device_rejected() -> None:
+    result = runner.invoke(app, ["train", "--device", "tpu"])
+    assert result.exit_code != 0
+
+
 @pytest.mark.skipif(_PL_AVAILABLE, reason="tests ImportError guard when training deps are absent")
 def test_train_exits_nonzero_when_deps_missing(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
