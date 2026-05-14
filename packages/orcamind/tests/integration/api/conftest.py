@@ -217,6 +217,51 @@ def mock_stat_embedder() -> MagicMock:
 # ---------------------------------------------------------------------------
 
 
+def _build_app(
+    mock_session,
+    mock_task_repo,
+    mock_experiment_repo,
+    mock_embedding_repo,
+    mock_perf_repo,
+    faiss_index,
+    mock_nn_selector,
+    mock_predictor,
+    mock_stat_embedder,
+    *,
+    state_faiss_index=None,
+):
+    """Wire a FastAPI app with all external dependencies replaced for testing."""
+    app = create_app()
+
+    mock_engine = MagicMock()
+    mock_engine.dispose = AsyncMock()
+    app.state.db_engine = mock_engine
+
+    @asynccontextmanager
+    async def _fake_sessionmaker():
+        m = AsyncMock()
+        m.execute.return_value = AsyncMock()
+        yield m
+
+    app.state.db_sessionmaker = _fake_sessionmaker
+    app.state.faiss_index = state_faiss_index
+    app.state.stat_embedder = mock_stat_embedder
+    app.state.nn_selector = mock_nn_selector
+    app.state.predictor = mock_predictor
+
+    app.dependency_overrides[get_db] = lambda: mock_session
+    app.dependency_overrides[get_task_repo] = lambda: mock_task_repo
+    app.dependency_overrides[get_experiment_repo] = lambda: mock_experiment_repo
+    app.dependency_overrides[get_embedding_repo] = lambda: mock_embedding_repo
+    app.dependency_overrides[get_perf_repo] = lambda: mock_perf_repo
+    app.dependency_overrides[get_faiss_index] = lambda: faiss_index
+    app.dependency_overrides[get_nn_selector] = lambda: mock_nn_selector
+    app.dependency_overrides[get_predictor] = lambda: mock_predictor
+    app.dependency_overrides[get_stat_embedder] = lambda: mock_stat_embedder
+
+    return app
+
+
 @pytest.fixture
 async def client(
     mock_session: AsyncMock,
@@ -229,41 +274,12 @@ async def client(
     mock_predictor: MagicMock,
     mock_stat_embedder: MagicMock,
 ) -> AsyncClient:
-    app = create_app()
-
-    # Pre-populate app.state (ASGITransport does not trigger the ASGI lifespan)
-    mock_engine = MagicMock()
-    mock_engine.dispose = AsyncMock()
-    app.state.db_engine = mock_engine
-
-    # db_sessionmaker must return an async context manager yielding a session.
-    # execute returns a plain AsyncMock so the health endpoint's SELECT 1 succeeds.
-    @asynccontextmanager
-    async def _fake_sessionmaker():
-        m = AsyncMock()
-        m.execute.return_value = AsyncMock()
-        yield m
-
-    app.state.db_sessionmaker = _fake_sessionmaker
-    app.state.faiss_index = None  # health endpoint reports faiss=False
-    app.state.stat_embedder = mock_stat_embedder
-    app.state.nn_selector = mock_nn_selector
-    app.state.predictor = mock_predictor
-
-    # Override FastAPI dependencies with test mocks
-    app.dependency_overrides[get_db] = lambda: mock_session
-    app.dependency_overrides[get_task_repo] = lambda: mock_task_repo
-    app.dependency_overrides[get_experiment_repo] = lambda: mock_experiment_repo
-    app.dependency_overrides[get_embedding_repo] = lambda: mock_embedding_repo
-    app.dependency_overrides[get_perf_repo] = lambda: mock_perf_repo
-    app.dependency_overrides[get_faiss_index] = lambda: mock_faiss_index
-    app.dependency_overrides[get_nn_selector] = lambda: mock_nn_selector
-    app.dependency_overrides[get_predictor] = lambda: mock_predictor
-    app.dependency_overrides[get_stat_embedder] = lambda: mock_stat_embedder
-
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as ac:
+    app = _build_app(
+        mock_session, mock_task_repo, mock_experiment_repo, mock_embedding_repo,
+        mock_perf_repo, mock_faiss_index, mock_nn_selector, mock_predictor,
+        mock_stat_embedder, state_faiss_index=None,
+    )
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
         yield ac
 
 
@@ -280,35 +296,10 @@ async def recommend_client(
     mock_stat_embedder: MagicMock,
 ) -> AsyncClient:
     """Test client that uses a real seeded FaissIndex for similar-tasks tests."""
-    app = create_app()
-
-    mock_engine = MagicMock()
-    mock_engine.dispose = AsyncMock()
-    app.state.db_engine = mock_engine
-
-    @asynccontextmanager
-    async def _fake_sessionmaker():
-        m = AsyncMock()
-        m.execute.return_value = AsyncMock()
-        yield m
-
-    app.state.db_sessionmaker = _fake_sessionmaker
-    app.state.faiss_index = seeded_faiss_index
-    app.state.stat_embedder = mock_stat_embedder
-    app.state.nn_selector = mock_nn_selector
-    app.state.predictor = mock_predictor
-
-    app.dependency_overrides[get_db] = lambda: mock_session
-    app.dependency_overrides[get_task_repo] = lambda: mock_task_repo
-    app.dependency_overrides[get_experiment_repo] = lambda: mock_experiment_repo
-    app.dependency_overrides[get_embedding_repo] = lambda: mock_embedding_repo
-    app.dependency_overrides[get_perf_repo] = lambda: mock_perf_repo
-    app.dependency_overrides[get_faiss_index] = lambda: seeded_faiss_index
-    app.dependency_overrides[get_nn_selector] = lambda: mock_nn_selector
-    app.dependency_overrides[get_predictor] = lambda: mock_predictor
-    app.dependency_overrides[get_stat_embedder] = lambda: mock_stat_embedder
-
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as ac:
+    app = _build_app(
+        mock_session, mock_task_repo, mock_experiment_repo, mock_embedding_repo,
+        mock_perf_repo, seeded_faiss_index, mock_nn_selector, mock_predictor,
+        mock_stat_embedder, state_faiss_index=seeded_faiss_index,
+    )
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
         yield ac
