@@ -215,15 +215,16 @@ class PerformanceRepository:
             )
             .join(ExperimentORM, PerformanceORM.experiment_id == ExperimentORM.experiment_id)
             .join(TaskORM, ExperimentORM.task_id == TaskORM.task_id)
-            .join(ModelORM, ExperimentORM.model_id == ModelORM.model_id)
+            .outerjoin(ModelORM, ExperimentORM.model_id == ModelORM.model_id)
             .where(PerformanceORM.metric_name == metric_name)
             .group_by(TaskORM.name, ModelORM.architecture)
+            .order_by(TaskORM.name, ModelORM.architecture)
         )
         return [
             PerformanceSummary(
                 task_name=row.task_name,
                 architecture=row.architecture or "unknown",
-                mean_accuracy=float(row.mean_accuracy),
+                mean_accuracy=float(row.mean_accuracy) if row.mean_accuracy is not None else 0.0,
             )
             for row in result.all()
         ]
