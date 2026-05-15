@@ -18,3 +18,6 @@ strict = true
 testpaths = ["packages/orca-shared/tests", "packages/orcamind/tests", "packages/orcalab/tests"]
 asyncio_mode = "auto"
 addopts = "--cov=packages --cov-report=term-missing"
+markers = [
+    "clean_torch_modules: clear torch from sys.modules before the test runs",
+]

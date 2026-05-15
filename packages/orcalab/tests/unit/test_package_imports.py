@@ -40,6 +40,7 @@ def test_cli_module_exposes_app() -> None:
     assert hasattr(cli, "app")
 
 
+@pytest.mark.clean_torch_modules
 def test_root_package_does_not_import_torch_on_load() -> None:
     import orcalab  # noqa: F401
 
