@@ -49,13 +49,20 @@ class TestMerge:
         assert "x" in result
         assert "y" in result
 
-    def test_conditions_from_all_spaces_are_preserved(self) -> None:
+    def test_conditions_from_all_spaces_are_preserved_in_order(self) -> None:
+        # space_a's condition always fires; space_b's condition requires cond_a
+        # to already be in sampled — this proves space_a's condition runs first.
         space_a = SearchSpace(name="a")
         space_a.add_condition(lambda _: True, IntParameter("cond_a", low=1, high=5))
         space_b = SearchSpace(name="b")
-        space_b.add_condition(lambda _: True, IntParameter("cond_b", low=10, high=20))
+        space_b.add_condition(
+            lambda sampled: "cond_a" in sampled,
+            IntParameter("cond_b", low=10, high=20),
+        )
         merged = SearchSpaceComposer.merge(space_a, space_b, name="merged")
-        assert len(merged._conditions) == 2
+        result = merged.sample(_trial())
+        assert "cond_a" in result
+        assert "cond_b" in result
 
     def test_merged_name_is_provided_name(self) -> None:
         space_a = _make_space("a", IntParameter("x", low=1, high=5))
@@ -95,13 +102,20 @@ class TestInherit:
         result = SearchSpaceComposer.inherit(parent, child)
         assert result.name == "child_name"
 
-    def test_conditions_from_both_parent_and_child_are_included(self) -> None:
+    def test_conditions_from_both_parent_and_child_are_included_in_order(self) -> None:
+        # parent's condition always fires; child's condition requires cond_p to
+        # already be sampled — this proves parent conditions precede child ones.
         parent = SearchSpace(name="parent")
         parent.add_condition(lambda _: True, IntParameter("cond_p", low=1, high=5))
         child = SearchSpace(name="child")
-        child.add_condition(lambda _: True, IntParameter("cond_c", low=10, high=20))
+        child.add_condition(
+            lambda sampled: "cond_p" in sampled,
+            IntParameter("cond_c", low=10, high=20),
+        )
         result = SearchSpaceComposer.inherit(parent, child)
-        assert len(result._conditions) == 2
+        sampled = result.sample(_trial())
+        assert "cond_p" in sampled
+        assert "cond_c" in sampled
 
 
 class TestRestrict:
