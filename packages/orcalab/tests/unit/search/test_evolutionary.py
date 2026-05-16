@@ -298,3 +298,19 @@ class TestEvolutionarySearchUpdateValidation:
     def test_invalid_direction_raises_value_error(self) -> None:
         with pytest.raises(ValueError, match="direction must be"):
             EvolutionarySearch(direction="sideways")
+
+    def test_zero_population_size_raises_value_error(self) -> None:
+        with pytest.raises(ValueError, match="population_size must be > 0"):
+            EvolutionarySearch(population_size=0)
+
+    def test_negative_population_size_raises_value_error(self) -> None:
+        with pytest.raises(ValueError, match="population_size must be > 0"):
+            EvolutionarySearch(population_size=-5)
+
+    def test_zero_sigma0_raises_value_error(self) -> None:
+        with pytest.raises(ValueError, match="sigma0 must be > 0"):
+            EvolutionarySearch(sigma0=0.0)
+
+    def test_negative_sigma0_raises_value_error(self) -> None:
+        with pytest.raises(ValueError, match="sigma0 must be > 0"):
+            EvolutionarySearch(sigma0=-0.1)
