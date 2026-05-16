@@ -51,6 +51,7 @@ async def meta_informed_sweep(
             task_id,
             params,
             {},
+            pruner=pruner,
             runner=runner,
             orcamind_client=orcamind_client if use_orcamind else None,
         )

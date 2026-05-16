@@ -16,6 +16,7 @@ from orcalab.orchestration.tasks.evaluate import evaluate
 from orcalab.orchestration.tasks.log_results import log_results
 from orcalab.orchestration.tasks.prepare_data import prepare_data
 from orcalab.orchestration.tasks.train_model import train_model
+from orcalab.pruning.base import Pruner
 
 
 @flow(name="single_experiment")
@@ -25,6 +26,7 @@ async def run_single_experiment(
     training_config: dict,
     *,
     storage: StorageBackend | None = None,
+    pruner: Pruner | None = None,
     runner: ExperimentRunner,
     orcamind_client: OrcaMindClient | None = None,
 ) -> ExperimentResult:
@@ -48,7 +50,7 @@ async def run_single_experiment(
         training_config=TrainingConfig(**training_config) if training_config else None,
     )
 
-    result = await train_model(experiment, pruner=None, runner=runner)
+    result = await train_model(experiment, pruner=pruner, runner=runner)
     await evaluate(result)
     if orcamind_client is not None:
         await log_results(result, orcamind_client)
