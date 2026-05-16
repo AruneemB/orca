@@ -61,9 +61,13 @@ class MetaInformedSearch(SearchStrategy):
     ) -> None:
         """Warm-start the base Bayesian strategy with priors fetched from OrcaMind.
 
-        Fetches the task embedding, top model recommendation, and similar tasks.
-        For each similar task, samples a candidate hyperparameter config from
-        ``search_space`` and pairs it with OrcaMind's predicted performance score.
+        Fetches the task embedding, top model recommendation, and the most similar
+        historical tasks. For each similar task, samples a random candidate
+        hyperparameter config from ``search_space`` and scores it as the product of
+        that task's similarity coefficient and the recommendation's predicted
+        performance, scaled by ``prior_weight``. This gives each prior a distinct,
+        task-informed score rather than a single shared value.
+
         Falls back silently on any network or HTTP error so the sweep is never blocked.
         """
         try:
@@ -85,15 +89,10 @@ class MetaInformedSearch(SearchStrategy):
                 sampler=optuna.samplers.RandomSampler()
             )
             priors: list[tuple[dict[str, Any], float]] = []
-            for _ in similar_tasks[: self._top_k_priors]:
+            for similar_task in similar_tasks[: self._top_k_priors]:
                 trial = sampler_study.ask()
                 params = search_space.sample(trial)
-                perf = await self._client.predict_performance(
-                    task_vec, recommendation.model_id
-                )
-                score = perf.final_metrics.get(
-                    "accuracy", recommendation.predicted_score
-                )
+                score = similar_task.score * recommendation.predicted_score
                 priors.append((params, score * self._prior_weight))
 
             if priors:
