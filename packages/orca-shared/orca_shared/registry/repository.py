@@ -135,7 +135,10 @@ class ExperimentRepository:
         self, *, limit: int = 500, offset: int = 0
     ) -> list[ExperimentResult]:
         result = await self._session.execute(
-            select(ExperimentORM).limit(limit).offset(offset)
+            select(ExperimentORM)
+            .order_by(ExperimentORM.experiment_id)
+            .limit(limit)
+            .offset(offset)
         )
         return [ExperimentResult.model_validate(r) for r in result.scalars()]
 
@@ -263,7 +266,10 @@ class SearchSpaceRepository:
         self, *, limit: int = 500, offset: int = 0
     ) -> list[SearchSpaceRecord]:
         result = await self._session.execute(
-            select(SearchSpaceORM).limit(limit).offset(offset)
+            select(SearchSpaceORM)
+            .order_by(SearchSpaceORM.search_space_id)
+            .limit(limit)
+            .offset(offset)
         )
         return [SearchSpaceRecord.model_validate(r) for r in result.scalars()]
 
