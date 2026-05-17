@@ -21,9 +21,10 @@ def loss_curve(history: list[dict], title: str = "Training Loss") -> go.Figure:
         fig.update_layout(title=title)
         return fig
 
-    epoch_key = "epoch" if "epoch" in history[0] else "step"
+    epoch_key = "epoch" if any("epoch" in row for row in history) else "step"
     skip_keys = {epoch_key, "run_id"}
-    metric_keys = [k for k in history[0] if k not in skip_keys]
+    # Union across all rows so metrics that first appear in later entries are included.
+    metric_keys = sorted({k for row in history for k in row if k not in skip_keys})
 
     for key in metric_keys:
         epochs, values = [], []
