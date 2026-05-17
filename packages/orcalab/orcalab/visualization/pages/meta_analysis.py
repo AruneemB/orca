@@ -55,17 +55,22 @@ def build_scatter_df(
     """
     records = []
     for e in experiments:
-        n_f = e.get("n_features") or 0
-        n_s = e.get("n_samples") or 0
+        n_f = e.get("n_features")
+        n_s = e.get("n_samples")
         val = (e.get("metrics") or {}).get(metric)
-        if val is not None and (n_f or n_s):
-            records.append(
-                {
-                    "complexity": int(n_f) * int(n_s),
-                    "accuracy": float(val),
-                    "experiment_id": str(e.get("experiment_id", ""))[:8],
-                }
-            )
+        if n_f is None or n_s is None or val is None:
+            continue
+        try:
+            complexity = int(n_f) * int(n_s)
+        except (TypeError, ValueError):
+            continue
+        records.append(
+            {
+                "complexity": complexity,
+                "accuracy": float(val),
+                "experiment_id": str(e.get("experiment_id", ""))[:8],
+            }
+        )
     if not records:
         return pd.DataFrame(columns=["complexity", "accuracy", "experiment_id"])
     return pd.DataFrame(records)
@@ -83,10 +88,12 @@ def build_trend_df(
     for e in experiments:
         completed_at = e.get("completed_at")
         val = (e.get("metrics") or {}).get(metric)
-        if completed_at and val is not None:
-            records.append(
-                {"completed_at": pd.to_datetime(completed_at), "value": float(val)}
-            )
+        if completed_at is None or val is None:
+            continue
+        ts = pd.to_datetime(completed_at, errors="coerce")
+        if pd.isna(ts):
+            continue
+        records.append({"completed_at": ts, "value": float(val)})
     if not records:
         return pd.DataFrame(columns=["completed_at", "value", "best_so_far"])
     df = pd.DataFrame(records).sort_values("completed_at").reset_index(drop=True)
