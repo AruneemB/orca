@@ -48,11 +48,13 @@ class TestIsParetoOptimal:
         assert pp._is_pareto_optimal([]) == []
 
     def test_mixed_domination(self, pp):
-        # A=(0.2, 0.8), B=(0.8, 0.2), C=(0.5, 0.5) – C is dominated by both A and B
-        result = pp._is_pareto_optimal([(0.2, 0.8), (0.8, 0.2), (0.5, 0.5)])
+        # A=(0.2, 0.3): dominates C on both axes
+        # B=(0.8, 0.2): non-dominated w.r.t. A (worse on x, better on y)
+        # C=(0.5, 0.5): A dominates C (0.2≤0.5 AND 0.3≤0.5 with strict on both)
+        result = pp._is_pareto_optimal([(0.2, 0.3), (0.8, 0.2), (0.5, 0.5)])
         assert result[0] is True   # A not dominated
         assert result[1] is True   # B not dominated
-        assert result[2] is False  # C dominated
+        assert result[2] is False  # C dominated by A
 
 
 # ── pareto_plot ───────────────────────────────────────────────────────────────

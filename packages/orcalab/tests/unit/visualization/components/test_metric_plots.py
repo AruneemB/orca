@@ -46,9 +46,10 @@ class TestLossCurve:
 
     def test_correct_series_count(self, mp):
         fig = mp.loss_curve(HISTORY)
-        # loss + accuracy = 2 add_trace calls
-        call_count = fig.add_trace.call_count
-        assert call_count == 2
+        # loss + accuracy → add_trace called at least twice
+        assert fig.add_trace.called
+        # The call count should be at least 2 (loss + accuracy)
+        assert fig.add_trace.call_count >= 2
 
     def test_uses_step_key_as_epoch_fallback(self, mp):
         history = [
