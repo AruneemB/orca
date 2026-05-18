@@ -178,7 +178,7 @@ Granular per-metric, per-epoch records for each experiment. Complements `experim
 
 ### `transfer_mappings`
 
-Pairwise source→target task transfer scores, used by OrcaMind's warm-start transfer selector.
+Pairwise source→target task transfer scores, used by OrcaMind's warm-start transfer selector and read by OrcaNet when scoring and persisting cross-domain knowledge transfer results.
 
 | Column           | Type              | Nullable | Notes                                           |
 |------------------|-------------------|----------|-------------------------------------------------|

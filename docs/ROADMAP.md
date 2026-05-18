@@ -27,12 +27,17 @@
 
 **Next:**
 
-## OrcaNet — Planned
+## OrcaNet — In Progress
 
-- Domain-adversarial cross-domain embedder (DANN)
-- Transfer scoring via Centered Kernel Alignment (CKA)
-- Hybrid retrieval: FAISS + PostgreSQL metadata filtering + LLM re-ranking
-- LangChain reasoning agent for transfer explanations
+**Done:**
+- Package scaffold: full module skeleton, `pyproject.toml`, multi-stage Dockerfile, Typer CLI (`serve` and `version` commands), Hydra config (`config.yaml`, `retriever/hybrid.yaml`, `embedder/cross_domain.yaml`, `llm/openai.yaml`), workspace registration in root `pyproject.toml`, full Docker Compose service wiring (depends on postgres, orcamind, orcalab with healthchecks, OPENAI_API_KEY passthrough), notebook scaffold with `.gitignore` override to preserve the cross-domain transfer demo notebook, unit test suite (package importability, parametrized submodule tests, per-test CLI runner fixture, pyproject.toml anchor config path resolution)
+
+**Next:**
+- Domain-adversarial cross-domain embedder (DANN) — `orcanet.embeddings`
+- Transfer scoring via Centered Kernel Alignment (CKA) — `orcanet.transfer`
+- Hybrid retrieval: FAISS + PostgreSQL metadata filtering + LLM re-ranking — `orcanet.retrieval`
+- LangChain ReAct reasoning agent for transfer explanations — `orcanet.reasoning`
+- Full FastAPI REST service (8 endpoints) — `orcanet.api`
 - Three-way pipeline: OrcaNet → OrcaMind → OrcaLab
 
 ## Platform — Planned

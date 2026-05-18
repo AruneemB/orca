@@ -6,14 +6,15 @@
 
 ## Overview
 
-The Orca platform exposes two independent HTTP services:
+The Orca platform exposes three independent HTTP services:
 
-| Service   | Default Port | Base URL              | Description                             |
-|-----------|-------------|----------------------|-----------------------------------------|
-| OrcaLab   | `8001`       | `http://localhost:8001` | Experiment orchestration and search      |
-| OrcaMind  | `8000`       | `http://localhost:8000` | Meta-learning engine and recommendations |
+| Service   | Default Port | Base URL              | Description                                        |
+|-----------|-------------|-----------------------|----------------------------------------------------|
+| OrcaMind  | `8000`       | `http://localhost:8000` | Meta-learning engine and recommendations           |
+| OrcaLab   | `8001`       | `http://localhost:8001` | Experiment orchestration and search                |
+| OrcaNet   | `8002`       | `http://localhost:8002` | Cross-domain knowledge transfer agent              |
 
-Both services auto-generate interactive API docs at `GET /docs` (Swagger UI) and `GET /redoc`.
+All services auto-generate interactive API docs at `GET /docs` (Swagger UI) and `GET /redoc`.
 
 All endpoints use the `/api/v1/` prefix. All request and response bodies are JSON. There is no authentication layer in the current release.
 
@@ -510,14 +511,153 @@ Returns mean metric values grouped by `(task_name, architecture)` — the data s
 
 ---
 
+## OrcaNet API — port 8002
+
+> The OrcaNet API is currently scaffolded. Endpoint implementations are in progress; this section describes the planned interface.
+
+OrcaNet orchestrates OrcaMind and OrcaLab to deliver end-to-end cross-domain knowledge transfer. It retrieves the best-performing model config for a source task from OrcaMind, scores transferability via Centered Kernel Alignment (CKA), dispatches a validation experiment to OrcaLab when the transfer score exceeds the threshold, and returns a structured recommendation with an LLM-generated explanation.
+
+### Transfer
+
+#### `POST /api/v1/transfer` — Recommend a transfer
+
+Status: **202 Accepted**
+
+Scores transferability from all candidate source tasks to the given target task, optionally validates the best candidate via OrcaLab, and returns the top recommendation with a reasoning trace.
+
+**Request body** — `TransferRequest`
+
+```json
+{
+  "target_task_id":      "uuid",
+  "top_k":               5,
+  "min_transfer_score":  0.4,
+  "run_validation":      true
+}
+```
+
+| Field                | Type      | Default | Description |
+|----------------------|-----------|---------|-------------|
+| `target_task_id`     | `string`  | —       | UUID of the target task already registered in OrcaMind |
+| `top_k`              | `int`     | `5`     | Number of source candidates to retrieve from the hybrid retrieval stage |
+| `min_transfer_score` | `float`   | `0.4`   | Candidates with CKA score below this are not dispatched to OrcaLab for validation |
+| `run_validation`     | `bool`    | `true`  | When `false`, returns the recommendation without waiting for an OrcaLab experiment |
+
+**Response** — `TransferRecommendation`
+
+```json
+{
+  "recommendation_id":  "uuid",
+  "target_task_id":     "uuid",
+  "source_task_id":     "uuid",
+  "transfer_score":     0.72,
+  "model_config":       { "architecture": "resnet18", "config": {} },
+  "validation_result":  { "experiment_id": "uuid", "metrics": {} },
+  "explanation":        "string",
+  "status":             "completed | pending | failed"
+}
+```
+
+---
+
+#### `GET /api/v1/transfer/{recommendation_id}` — Get transfer status
+
+**Response** — `TransferRecommendation` or **404**
+
+Poll this endpoint after a `POST /api/v1/transfer` with `run_validation: true` to wait for the OrcaLab validation experiment to complete.
+
+---
+
+### Retrieval
+
+#### `POST /api/v1/similar-tasks` — Find similar tasks
+
+Three-stage hybrid retrieval: FAISS vector similarity → PostgreSQL metadata filter → optional LLM re-ranking.
+
+**Request body** — `SimilarTasksRequest`
+
+```json
+{
+  "target_task_id": "uuid",
+  "top_k":          10,
+  "use_reranking":  true
+}
+```
+
+**Response** — `list[SimilarTaskResult]`
+
+```json
+[
+  { "task_id": "uuid", "score": 0.91, "rank": 1, "reason": "string | null" }
+]
+```
+
+---
+
+### Architecture
+
+#### `POST /api/v1/recommend-architecture` — Recommend architecture for target task
+
+Fetches model candidates from OrcaMind, applies domain-adversarial embeddings to score cross-domain transferability, and returns ranked architectures.
+
+**Request body**
+
+```json
+{
+  "target_task_id": "uuid",
+  "top_k":          5
+}
+```
+
+**Response** — `list[ModelRecommendation]` (same schema as OrcaMind `/recommend-model`)
+
+---
+
+### Reasoning
+
+#### `POST /api/v1/explain-transfer` — Generate transfer explanation
+
+Runs the LangChain ReAct agent to produce a human-readable explanation of why a particular source–target pair is a strong transfer candidate.
+
+**Request body**
+
+```json
+{
+  "source_task_id": "uuid",
+  "target_task_id": "uuid",
+  "transfer_score":  0.72
+}
+```
+
+**Response**
+
+```json
+{ "explanation": "string", "reasoning_trace": ["string"] }
+```
+
+---
+
+### Transfer Mappings
+
+#### `GET /api/v1/transfer-mappings` — List stored transfer mappings
+
+Returns persisted pairwise source→target transfer scores from the `transfer_mappings` registry table.
+
+**Query parameters**: `limit` (default 50, max 500), `offset` (default 0), `source_task_id` (filter)
+
+**Response** — `list[TransferMapping]`
+
+---
+
 ## Health Endpoints
 
-Both services expose a health endpoint with no authentication requirement.
+All three services expose a health endpoint with no authentication requirement.
 
-| Service  | Endpoint           | Healthy response                                     |
-|----------|--------------------|------------------------------------------------------|
-| OrcaMind | `GET /health`      | `{"status": "ok", "faiss": true \| false}`            |
-| OrcaLab  | `GET /health`      | `{"status": "ok", "prefect": "http://..." \| null}`   |
+| Service  | Endpoint           | Healthy response                                                              |
+|----------|--------------------|-------------------------------------------------------------------------------|
+| OrcaMind | `GET /health`      | `{"status": "ok", "faiss": true \| false}`                                     |
+| OrcaLab  | `GET /health`      | `{"status": "ok", "prefect": "http://..." \| null}`                            |
+| OrcaNet  | `GET /health`      | `{"status": "ok", "orcamind": "http://...", "orcalab": "http://..."}`          |
 
 The OrcaMind health endpoint reports `faiss: false` when the FAISS index has not been built yet. The service remains fully operational — only `/recommend-model` and `/similar-tasks` return 503 until the index is populated.
 
@@ -536,4 +676,5 @@ All Pydantic models live in `packages/orca-shared/orca_shared/schemas/`.
 | `model.py`         | `ModelConfig`, `ModelSummary`                             |
 | `metrics.py`       | `MetricPoint`, `PerformanceMetrics`, `PerformanceSummary` |
 | `search_space.py`  | `SearchSpaceRecord`                                       |
+| `transfer.py`      | `TransferMapping`, `TransferScore`, `TransferRecommendation` |
 
