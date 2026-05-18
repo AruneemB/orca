@@ -7,7 +7,13 @@ from pathlib import Path
 import pytest
 from omegaconf import OmegaConf
 
-CONFIG_DIR = Path(__file__).parents[3] / "config"
+# Walk ancestors until we find the orcanet package root (identified by pyproject.toml),
+# then point at the sibling config/ directory. This is robust to test file moves.
+_here = Path(__file__).resolve()
+_pkg_root = _here.parent
+while not (_pkg_root / "pyproject.toml").exists() and _pkg_root != _pkg_root.parent:
+    _pkg_root = _pkg_root.parent
+CONFIG_DIR = _pkg_root / "config"
 
 
 def _load(relative: str):
