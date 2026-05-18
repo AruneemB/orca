@@ -7,7 +7,7 @@ llm:
   provider: openai
   model: gpt-4-turbo
   temperature: 0.7
-  api_key: ${oc.env:OPENAI_API_KEY}
+  api_key: ${oc.env:OPENAI_API_KEY,}
 
 retrieval:
   top_k_initial: 50
