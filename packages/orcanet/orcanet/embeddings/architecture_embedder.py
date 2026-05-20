@@ -98,7 +98,13 @@ class ArchitectureGraph:
         sizes: list[int] = []
         for i, layer in enumerate(layers):
             layer_type = str(layer.get("type", "linear")).lower()
-            layer_size = int(layer.get("size", 1))
+            try:
+                layer_size = int(layer.get("size", 1))
+            except (TypeError, ValueError):
+                layer_size = 1
+            if layer_size < 0:
+                logger.debug("Layer %d has negative size %d; clamping to 0.", i, layer_size)
+                layer_size = 0
             activation = str(layer.get("activation", "none")).lower()
 
             if layer_type in _LAYER_TYPES:
@@ -117,7 +123,13 @@ class ArchitectureGraph:
 
         # Optional skip connections
         for pair in config.get("skip_connections", []):
-            s, d = int(pair[0]), int(pair[1])
+            try:
+                if len(pair) < 2:
+                    raise ValueError("skip_connection entry must have at least two elements")
+                s, d = int(pair[0]), int(pair[1])
+            except (TypeError, ValueError, IndexError):
+                logger.debug("Skipping malformed skip_connection entry: %r", pair)
+                continue
             if 0 <= s < n_nodes and 0 <= d < n_nodes:
                 src.append(s)
                 dst.append(d)
