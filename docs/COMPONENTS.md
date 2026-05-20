@@ -1493,16 +1493,19 @@ All sensitive values use `${oc.env:VAR}` (required) or `${oc.env:VAR,default}` (
 
 ### Test Infrastructure (`tests/`)
 
-Three unit test files and two empty `__init__.py` placeholders for future integration tests.
+Four unit test files across two directories, plus two empty `__init__.py` placeholders for future integration tests.
 
 | File | Tests | Covers |
 |---|---|---|
-| `tests/unit/test_package.py` | 4 | Package importability, `__version__` string, parametrized submodule imports (6 submodules in one test), no unexpected `sys.modules` side effects |
+| `tests/unit/test_package.py` | 4 | Package importability, `__version__` string, parametrized submodule imports (6 submodules in one test), no unexpected `sys.modules` side effects on `import orcanet.embeddings` (enforces the lazy-import shim) |
 | `tests/unit/test_cli.py` | 4 | `version` output matches `__version__`, `--help` exit 0, `serve --help` shows `--host`/`--port`/`--reload`, `no_args_is_help=True` shows both commands |
 | `tests/unit/test_config.py` | 10 | Root config key presence, retrieval defaults, LLM defaults, hybrid retriever YAML, cross-domain embedder dimensions, OpenAI LLM YAML, all `.yaml` files parseable by OmegaConf |
+| `tests/unit/embeddings/test_cross_domain.py` | 15 | `GradientReversalLayer` gradient negation, alpha scaling, forward identity, zero-alpha passthrough; `CrossDomainEmbedder` output shape, L2 normalisation, eval/training mode preservation across `embed()` calls; DANN task-loss convergence over 20 epochs; domain invariance geometric dispersion (within- vs. cross-domain cosine distance std ratio); `save`/`load` roundtrip embedding equality; config attribute round-trip fidelity |
 
 **Notable patterns introduced in the OrcaNet test suite:**
 
 - *Parametrized submodule imports* — the six submodule import tests are expressed as a single `@pytest.mark.parametrize("submodule", [...])` test rather than six separate functions. Adding a new namespace requires only a new entry in the parameter list.
 - *Per-test CLI runner fixture* — `CliRunner` is instantiated via a `scope="function"` pytest fixture, not at module level, so runner state never leaks between tests.
 - *pyproject.toml anchor path resolution* — `test_config.py` locates `config/` by walking ancestor directories until a `pyproject.toml` is found. This is robust to test file moves and avoids the fragile `parents[N]` depth index that breaks when the file is relocated.
+- *Training-mode preservation testing* — `test_embed_preserves_training_mode` and `test_embed_preserves_eval_mode` verify that `embed()` does not permanently mutate the model's training state, asserting correctness in both directions (model in `.train()` stays in training mode after `embed()` returns; model already in `.eval()` stays in eval mode). This matters because `embed()` is commonly called from inside a training loop for online evaluation.
+- *Domain invariance as a geometric assertion* — `TestDomainInvariance.test_within_vs_cross_domain_spread` quantifies the invariance property by computing the standard deviation of cosine distances within each domain and across domains on domain-shifted synthetic data, then asserting the ratio lies in [0.3, 3.0]. This avoids testing exact cluster assignments (which would be brittle) while still enforcing the geometric property that the retrieval layer depends on.
