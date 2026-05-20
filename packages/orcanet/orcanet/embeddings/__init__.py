@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-__all__ = ["CrossDomainEmbedder", "GradientReversalLayer"]
+__all__ = ["CrossDomainEmbedder", "GradientReversalLayer", "TextTaskEmbedder"]
 
 
 def __getattr__(name: str) -> object:
@@ -14,4 +14,8 @@ def __getattr__(name: str) -> object:
         from .cross_domain import GradientReversalLayer
 
         return GradientReversalLayer
+    if name == "TextTaskEmbedder":
+        from .text_features import TextTaskEmbedder
+
+        return TextTaskEmbedder
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
