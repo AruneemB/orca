@@ -263,7 +263,12 @@ class ArchitectureEmbedder(nn.Module):
         Returns:
             List of ``(config, similarity_score)`` tuples sorted by similarity descending.
             Length is ``min(top_k, len(candidates))``.
+
+        Raises:
+            ValueError: If ``top_k`` is negative.
         """
+        if top_k < 0:
+            raise ValueError(f"top_k must be non-negative, got {top_k}")
         query_emb = self.embed(query)
         scored: list[tuple[ModelConfig, float]] = [
             (c, float(np.dot(query_emb, self.embed(c)))) for c in candidates
