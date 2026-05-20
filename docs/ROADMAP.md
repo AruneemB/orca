@@ -31,9 +31,9 @@
 
 **Done:**
 - Package scaffold: full module skeleton, `pyproject.toml`, multi-stage Dockerfile, Typer CLI (`serve` and `version` commands), Hydra config (`config.yaml`, `retriever/hybrid.yaml`, `embedder/cross_domain.yaml`, `llm/openai.yaml`), workspace registration in root `pyproject.toml`, full Docker Compose service wiring (depends on postgres, orcamind, orcalab with healthchecks, OPENAI_API_KEY passthrough), notebook scaffold with `.gitignore` override to preserve the cross-domain transfer demo notebook, unit test suite (package importability, parametrized submodule tests, per-test CLI runner fixture, pyproject.toml anchor config path resolution)
+- Domain-adversarial cross-domain embedder: `CrossDomainEmbedder` (Ganin et al. 2016) maps 25-dim statistical meta-features to a 64-dim domain-invariant embedding space; shared `_FeatureMLP` [128→64] trunk feeds a task-type classifier and an adversarial domain classifier separated by `GradientReversalLayer` with mutable `alpha`; `fit()` optimises `L_task + λ·L_domain` under the Ganin progressive schedule (`α(p) = 2/(1+exp(−10p))−1`); `embed()` returns L2-normalised unit-sphere vectors for cosine similarity retrieval and safely restores the caller's training mode in a `finally` block; `save()`/`load()` checkpoint config + `state_dict()` with `weights_only=True`; public API exposed from `orcanet.embeddings` via a lazy `__getattr__` shim that defers `import torch` until first access; 15-test unit suite covering GRL gradient negation, alpha scaling, output shape, L2 normalisation, training-mode preservation, DANN convergence, domain invariance dispersion ratio, and persistence roundtrip
 
 **Next:**
-- Domain-adversarial cross-domain embedder (DANN) — `orcanet.embeddings`
 - Transfer scoring via Centered Kernel Alignment (CKA) — `orcanet.transfer`
 - Hybrid retrieval: FAISS + PostgreSQL metadata filtering + LLM re-ranking — `orcanet.retrieval`
 - LangChain ReAct reasoning agent for transfer explanations — `orcanet.reasoning`
