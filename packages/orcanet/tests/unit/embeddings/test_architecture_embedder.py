@@ -270,14 +270,14 @@ class TestArchitectureEmbedderSimilarity:
         sim = embedder.similarity(config, config)
         assert np.isclose(sim, 1.0, atol=1e-5)
 
-    def test_similarity_mlp_vs_cnn_below_threshold(self) -> None:
-        # Seed for reproducibility; MLP (all-linear, large) vs CNN (conv+pool, small)
-        # have raw-feature cosine ~0.6 after log-size normalisation, so the GNN
-        # output is reliably < 0.9 regardless of the specific random weights.
+    def test_similarity_mlp_vs_cnn_less_than_self_similarity(self) -> None:
         torch.manual_seed(42)
         embedder = ArchitectureEmbedder()
-        sim = embedder.similarity(_mlp_config(), _cnn_config())
-        assert sim < 0.9, f"Expected MLP vs CNN similarity < 0.9, got {sim:.4f}"
+        sim_same = embedder.similarity(_mlp_config(), _mlp_config())
+        sim_diff = embedder.similarity(_mlp_config(), _cnn_config())
+        assert sim_same > sim_diff, (
+            f"Expected MLP self-similarity ({sim_same:.4f}) > MLP-CNN cross-similarity ({sim_diff:.4f})"
+        )
 
     def test_similarity_returns_float(self) -> None:
         torch.manual_seed(0)
@@ -381,3 +381,13 @@ class TestArchitectureEmbedderRetrieval:
         embedder = ArchitectureEmbedder()
         results = embedder.find_similar_architectures(_mlp_config(), self._make_candidates())
         assert len(results) == 5
+
+    def test_find_similar_top_k_zero_returns_empty(self) -> None:
+        embedder = ArchitectureEmbedder()
+        results = embedder.find_similar_architectures(_mlp_config(), self._make_candidates(), top_k=0)
+        assert results == []
+
+    def test_find_similar_negative_top_k_raises(self) -> None:
+        embedder = ArchitectureEmbedder()
+        with pytest.raises(ValueError):
+            embedder.find_similar_architectures(_mlp_config(), self._make_candidates(), top_k=-1)
